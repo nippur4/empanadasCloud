@@ -1,107 +1,14 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Pedidos de Empanadas 🫓</title>
-<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
-<style>
-  *{box-sizing:border-box;margin:0;padding:0}
-  body{font-family:'Segoe UI',sans-serif;background:#f7f7f5;color:#1a1a1a;min-height:100vh}
-  .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:10px 18px;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;transition:all .15s}
-  .btn:disabled{opacity:.5;cursor:not-allowed}
-  .btn-primary{background:#1a1a1a;color:#fff}.btn-primary:hover:not(:disabled){background:#333}
-  .btn-danger{background:#fff;color:#c0392b;border:1.5px solid #c0392b}.btn-danger:hover:not(:disabled){background:#c0392b;color:#fff}
-  .btn-success{background:#2ecc71;color:#fff}.btn-success:hover:not(:disabled){background:#27ae60}
-  .btn-sm{padding:5px 10px;font-size:12px;border-radius:6px}
-  .badge{display:inline-block;background:#f0f0ee;color:#555;border-radius:99px;font-size:12px;padding:2px 9px;font-weight:600}
-
-  .view{display:none;min-height:100vh;flex-direction:column}
-  .view.active{display:flex}
-
-  /* LANDING */
-  #landingView{align-items:center;justify-content:center;text-align:center;padding:32px}
-  #landingView h1{font-size:30px;font-weight:800;margin-bottom:8px}
-  #landingView h1 span{color:#e67e22}
-  #landingView p{color:#888;font-size:15px;margin-bottom:28px}
-
-  /* HOST */
-  #hostView{flex-direction:column}
-  .host-header{background:#fff;border-bottom:1px solid #e8e8e5;padding:18px 28px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px}
-  .host-header h1{font-size:19px;font-weight:700}.host-header h1 span{color:#e67e22}
-  .header-actions{display:flex;gap:10px;flex-wrap:wrap}
-  .status-bar{font-size:12px;color:#999;padding:6px 28px;background:#f7f7f5;border-bottom:1px solid #e8e8e5;display:flex;align-items:center;gap:6px}
-  .link-bar{background:#fff;padding:16px 28px;display:flex;gap:10px;align-items:center;border-bottom:1px solid #e8e8e5;flex-wrap:wrap}
-  .link-box{flex:1;background:#f7f7f5;border:1.5px solid #e8e8e5;border-radius:8px;padding:9px 13px;font-size:13px;color:#444;font-family:monospace;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;min-width:0}
-  .main-content{padding:24px 28px;flex:1}
-  .section-title{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#999;margin-bottom:14px}
-  .summary-grid{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:28px}
-  .summary-card{background:#fff;border:1.5px solid #e8e8e5;border-radius:10px;padding:10px 16px;display:flex;align-items:center;gap:10px;min-width:175px}
-  .summary-card .sabor{font-size:13px;font-weight:600}
-  .summary-card .count{font-size:22px;font-weight:800;color:#e67e22;margin-left:auto}
-  .table-wrap{background:#fff;border:1.5px solid #e8e8e5;border-radius:12px;overflow:hidden}
-  table{width:100%;border-collapse:collapse}
-  thead th{background:#f7f7f5;padding:10px 16px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#999;border-bottom:1.5px solid #e8e8e5}
-  tbody tr{border-bottom:1px solid #f0f0ee;transition:background .1s}
-  tbody tr:last-child{border-bottom:none}
-  tbody tr:hover{background:#fafaf8}
-  td{padding:11px 16px;font-size:14px;vertical-align:middle}
-  .nick-btn{font-weight:700;cursor:pointer;border-bottom:1.5px dashed #ccc;background:none;border-top:none;border-left:none;border-right:none;font-size:14px;font-family:inherit;padding:0;color:#1a1a1a}
-  .nick-btn:hover{color:#e67e22;border-color:#e67e22}
-  .empty-state{text-align:center;padding:40px;color:#bbb;font-size:14px}
-  .readonly-badge{display:inline-block;background:#fff3cd;color:#856404;border:1px solid #ffc107;border-radius:6px;font-size:11px;font-weight:700;padding:2px 8px;margin-left:8px}
-
-  /* CLIENT */
-  #clientView{align-items:center}
-  .client-inner{width:100%;max-width:520px;padding:28px 16px}
-  .client-header{text-align:center;margin-bottom:24px}
-  .client-header h1{font-size:24px;font-weight:800;margin-bottom:6px}
-  .client-header h1 span{color:#e67e22}
-  .client-header p{color:#888;font-size:14px}
-  .form-card{background:#fff;border:1.5px solid #e8e8e5;border-radius:14px;padding:22px;margin-bottom:14px}
-  .form-card label{display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#999;margin-bottom:8px}
-  .form-card input[type=text]{width:100%;padding:10px 13px;border:1.5px solid #e8e8e5;border-radius:8px;font-size:15px;outline:none;transition:border .15s}
-  .form-card input[type=text]:focus{border-color:#e67e22}
-  .emp-row{display:flex;align-items:center;justify-content:space-between;padding:9px 0;border-bottom:1px solid #f0f0ee}
-  .emp-row:last-child{border-bottom:none}
-  .emp-name{font-size:14px;font-weight:500}
-  .qty-ctrl{display:flex;align-items:center;gap:10px}
-  .qty-btn{width:28px;height:28px;border-radius:8px;border:1.5px solid #e8e8e5;background:#fff;font-size:17px;cursor:pointer;font-weight:700;color:#555;display:flex;align-items:center;justify-content:center;transition:all .1s}
-  .qty-btn:hover{background:#1a1a1a;color:#fff;border-color:#1a1a1a}
-  .qty-val{min-width:22px;text-align:center;font-size:15px;font-weight:700}
-  .submit-btn{width:100%;padding:14px;font-size:16px;border-radius:10px}
-
-  /* SUCCESS / INVALID */
-  #successView,#invalidView{align-items:center;justify-content:center;text-align:center;padding:32px}
-  .big-emoji{font-size:64px;margin-bottom:16px}
-  .big-title{font-size:24px;font-weight:800;margin-bottom:8px}
-  .big-sub{color:#888;font-size:15px}
-
-  /* MODALS */
-  .modal-overlay{position:fixed;inset:0;z-index:200;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.45);padding:16px}
-  .modal-overlay.open{display:flex}
-  .modal{background:#fff;border-radius:16px;padding:28px;max-width:480px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.2);max-height:90vh;overflow-y:auto}
-  .modal h3{font-size:17px;font-weight:700;margin-bottom:16px}
-  .modal-close{margin-top:16px;width:100%}
-
-  /* detail modal */
-  .detail-row{display:flex;justify-content:space-between;padding:6px 0;font-size:14px;border-bottom:1px solid #f0f0ee}
-  .detail-row:last-of-type{border-bottom:none}
-  .detail-total{margin-top:12px;font-weight:700;font-size:14px;display:flex;justify-content:space-between}
-
-  /* history modal */
-  .hist-item{display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid #f0f0ee;gap:10px}
-  .hist-item:last-child{border-bottom:none}
-  .hist-info .hist-date{font-size:13px;font-weight:600}
-  .hist-info .hist-code{font-size:11px;color:#999;font-family:monospace;margin-top:2px}
-  .hist-info .hist-count{font-size:11px;color:#e67e22;margin-top:2px}
-
-  .spinner{display:inline-block;width:15px;height:15px;border:2px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;animation:spin .6s linear infinite}
-  @keyframes spin{to{transform:rotate(360deg)}}
-  .dot{width:8px;height:8px;border-radius:50%;background:#2ecc71;display:inline-block;animation:pulse 1.5s infinite;flex-shrink:0}
-  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
-</style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pedidos de Empanadas 🫓</title>
+  <link rel="stylesheet" href="styles.css">
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+  <script src="config.js"></script>
+  <script src="sabores.js"></script>
 </head>
 <body>
 
@@ -118,16 +25,18 @@
 <!-- HOST PANEL -->
 <div id="hostView" class="view">
   <div class="host-header">
-    <h1>🫓 Panel <span>Organizador</span> <span id="readonlyBadge" class="readonly-badge" style="display:none">HISTORIAL — sólo lectura</span></h1>
+    <h1>🫓 Panel <span>Organizador</span>
+      <span id="readonlyBadge" class="readonly-badge" style="display:none">HISTORIAL — sólo lectura</span>
+    </h1>
     <div class="header-actions">
       <button class="btn btn-primary" onclick="openHistoryModal()">📂 Historial</button>
       <button class="btn btn-danger" id="resetBtn" onclick="resetDashboard()">🗑 Reiniciar</button>
     </div>
   </div>
-  <div class="status-bar" id="statusBar"><span class="dot"></span>&nbsp;Conectado — actualizando en tiempo real</div>
+  <div class="status-bar" id="statusBar"><span class="dot"></span>&nbsp;Conectado</div>
   <div class="link-bar" id="linkBar">
     <span style="font-size:13px;font-weight:600;white-space:nowrap">🔗 Link para amigos:</span>
-    <div class="link-box" id="linkDisplay">Generando…</div>
+    <div class="link-box" id="linkDisplay">—</div>
     <button class="btn btn-success" id="copyBtn" onclick="copyLink()">Copiar link</button>
   </div>
   <div class="main-content">
@@ -138,7 +47,7 @@
     <div class="section-title" style="margin-top:4px">Pedidos por persona</div>
     <div class="table-wrap">
       <table>
-        <thead><tr><th>Nickname</th><th>Total</th><th id="actionsHeader"></th></tr></thead>
+        <thead><tr><th>Nickname</th><th>Total</th><th id="actionsHeader">Acciones</th></tr></thead>
         <tbody id="ordersBody">
           <tr><td colspan="3" class="empty-state">Nadie pidió todavía.</td></tr>
         </tbody>
@@ -163,7 +72,9 @@
       <label>¿Qué empanadas querés?</label>
       <div id="empanadasList"></div>
     </div>
-    <button class="btn btn-success submit-btn" id="submitBtn" onclick="submitOrder()">Guardar pedido ✓</button>
+    <button class="btn btn-success submit-btn" id="submitBtn" onclick="submitOrder()">
+      Guardar pedido ✓
+    </button>
   </div>
 </div>
 
@@ -195,286 +106,11 @@
 <div class="modal-overlay" id="historyModal" onclick="closeMO('historyModal',event)">
   <div class="modal">
     <h3>📂 Historial de pedidos</h3>
-    <div id="historyList"><p style="color:#bbb;font-size:14px;text-align:center;padding:20px">Cargando…</p></div>
+    <div id="historyList"><p class="empty-state">Cargando…</p></div>
     <button class="btn btn-primary modal-close" onclick="closeMO('historyModal')">Cerrar</button>
   </div>
 </div>
 
-<script>
-  // ──────────────────────────────────────────
-  // 🔧 REEMPLAZÁ CON TU CONFIGURACIÓN FIREBASE
-  // ──────────────────────────────────────────
-const firebaseConfig = {
-  apiKey: "AIzaSyACR4RYlOgUp2t9x5ttKqNcYLN_KEQvIqg",
-  authDomain: "empanadas-app-7502e.firebaseapp.com",
-  databaseURL: "https://empanadas-app-7502e-default-rtdb.firebaseio.com",
-  projectId: "empanadas-app-7502e",
-  storageBucket: "empanadas-app-7502e.firebasestorage.app",
-  messagingSenderId: "755178755806",
-  appId: "1:755178755806:web:d53f860165dac8f972544f",
-  measurementId: "G-08XV8R7EE9"
-};
-  // ──────────────────────────────────────────
-
-  firebase.initializeApp(firebaseConfig);
-  const db = firebase.database();
-
-  const SABORES = [
-    "Carne suave","Carne picante","Carne dulce","Carne picada suave",
-    "Pollo picante","Pollo suave","Jamón y queso","Cebolla y queso",
-    "Roquefort","Roquefort y jamón","Brócoli y ricota","Primavera",
-    "Capresse","Calabresa","Verdura y salsa blanca","Humita",
-    "Humita y mozzarella","Atún","Ciruela y panceta","Cheeseburguer"
-  ];
-
-  let sessionCode = null;
-  let isReadonly = false;  // true cuando se visualiza historial
-  let currentOrdersListener = null;
-
-  // ── ROUTING ──
-  async function init() {
-    const params = new URLSearchParams(window.location.search);
-    const code = params.get("code");
-    if (code) {
-      const snap = await db.ref(`sessions/${code}`).get();
-      if (snap.exists()) {
-        sessionCode = code;
-        showClientView();
-      } else {
-        showView("invalidView");
-      }
-    } else {
-      showView("landingView");
-    }
-  }
-
-  function showView(id) {
-    document.querySelectorAll(".view").forEach(v => v.classList.remove("active"));
-    document.getElementById(id).classList.add("active");
-  }
-
-  // ── HOST ──
-  async function goHost() {
-    isReadonly = false;
-    showView("hostView");
-    sessionCode = genCode();
-    // Guardar sesión en Firebase con timestamp y label legible
-    const label = new Date().toLocaleString("es-AR", {day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"});
-    await db.ref(`sessions/${sessionCode}`).set({ createdAt: Date.now(), label });
-    updateHostUI();
-    listenOrders(sessionCode);
-  }
-
-  function updateHostUI() {
-    // link bar
-    document.getElementById("linkBar").style.display = isReadonly ? "none" : "flex";
-    // reset btn
-    document.getElementById("resetBtn").style.display = isReadonly ? "none" : "inline-flex";
-    // readonly badge
-    document.getElementById("readonlyBadge").style.display = isReadonly ? "inline-block" : "none";
-    // acciones column header
-    document.getElementById("actionsHeader").textContent = isReadonly ? "" : "Acciones";
-    // link
-    if (!isReadonly) {
-      const link = `${window.location.origin}${window.location.pathname}?code=${sessionCode}`;
-      document.getElementById("linkDisplay").textContent = link;
-    }
-  }
-
-  function listenOrders(code) {
-    // Desuscribir listener anterior si existe
-    if (currentOrdersListener) {
-      db.ref(`orders/${currentOrdersListener}`).off();
-    }
-    currentOrdersListener = code;
-    db.ref(`orders/${code}`).on("value", snap => {
-      const data = snap.val() || {};
-      renderDashboard(Object.values(data));
-    });
-  }
-
-  function renderDashboard(orders) {
-    // Resumen por sabor
-    const totals = {};
-    orders.forEach(o => Object.entries(o.pedido).forEach(([s,q]) => totals[s]=(totals[s]||0)+q));
-    const grid = document.getElementById("summaryGrid");
-    grid.innerHTML = Object.keys(totals).length
-      ? Object.entries(totals).sort((a,b)=>b[1]-a[1])
-          .map(([s,q])=>`<div class="summary-card"><span class="sabor">${esc(s)}</span><span class="count">${q}</span></div>`).join("")
-      : `<div class="empty-state" style="width:100%;padding:16px">Sin pedidos aún.</div>`;
-
-    // Tabla por persona
-    const tbody = document.getElementById("ordersBody");
-    const colSpan = isReadonly ? 2 : 3;
-    tbody.innerHTML = orders.length
-      ? orders.sort((a,b)=>a.ts-b.ts).map(o => {
-          const key = nickToKey(o.nick);
-          const deleteBtn = isReadonly ? "" :
-            `<button class="btn btn-danger btn-sm" onclick="deleteOrder('${esc(key)}','${esc(o.nick)}')">✕ Borrar</button>`;
-          return `<tr>
-            <td><button class="nick-btn" onclick="showDetail('${esc(o.nick)}')">${esc(o.nick)}</button></td>
-            <td><span class="badge">${o.total} 🫓</span></td>
-            <td>${deleteBtn}</td>
-          </tr>`;
-        }).join("")
-      : `<tr><td colspan="${colSpan}" class="empty-state">Nadie pidió todavía.</td></tr>`;
-
-    if (!isReadonly) {
-      document.getElementById("statusBar").innerHTML =
-        `<span class="dot"></span>&nbsp;En vivo · Última actualización: ${new Date().toLocaleTimeString("es-AR")}`;
-    }
-  }
-
-  // ── BORRAR PEDIDO INDIVIDUAL ──
-  async function deleteOrder(key, nick) {
-    if (!confirm(`¿Borrar el pedido de "${nick}"?`)) return;
-    await db.ref(`orders/${sessionCode}/${key}`).remove();
-  }
-
-  // ── REINICIAR ──
-  async function resetDashboard() {
-    if (!confirm("¿Borrás todos los pedidos y generás un link nuevo?")) return;
-    db.ref(`orders/${currentOrdersListener}`).off();
-    currentOrdersListener = null;
-    await db.ref(`orders/${sessionCode}`).remove();
-    // Mantener la sesión vieja en el historial pero crear una nueva
-    sessionCode = genCode();
-    const label = new Date().toLocaleString("es-AR",{day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"});
-    await db.ref(`sessions/${sessionCode}`).set({ createdAt: Date.now(), label });
-    isReadonly = false;
-    updateHostUI();
-    listenOrders(sessionCode);
-  }
-
-  // ── HISTORIAL ──
-  async function openHistoryModal() {
-    document.getElementById("historyModal").classList.add("open");
-    document.getElementById("historyList").innerHTML = `<p style="color:#bbb;font-size:14px;text-align:center;padding:20px">Cargando…</p>`;
-
-    const snap = await db.ref("sessions").orderByChild("createdAt").get();
-    const sessions = [];
-    snap.forEach(child => sessions.push({ code: child.key, ...child.val() }));
-    sessions.reverse(); // más reciente primero
-
-    if (!sessions.length) {
-      document.getElementById("historyList").innerHTML = `<p style="color:#bbb;font-size:14px;text-align:center;padding:20px">No hay sesiones guardadas.</p>`;
-      return;
-    }
-
-    // Para cada sesión, contar cuántas personas pidieron
-    const counts = await Promise.all(sessions.map(async s => {
-      const o = await db.ref(`orders/${s.code}`).get();
-      return o.exists() ? Object.keys(o.val()).length : 0;
-    }));
-
-    document.getElementById("historyList").innerHTML = sessions.map((s, i) => `
-      <div class="hist-item">
-        <div class="hist-info">
-          <div class="hist-date">${s.label || "Sesión sin fecha"}</div>
-          <div class="hist-code">Código: ${s.code}</div>
-          <div class="hist-count">${counts[i]} persona${counts[i]!==1?"s":""} pidieron</div>
-        </div>
-        <button class="btn btn-primary btn-sm" onclick="loadHistorySession('${s.code}')">Ver →</button>
-      </div>`).join("");
-  }
-
-  async function loadHistorySession(code) {
-    closeMO("historyModal");
-    // Desuscribir listener de tiempo real y cargar datos estáticos
-    if (currentOrdersListener) db.ref(`orders/${currentOrdersListener}`).off();
-    currentOrdersListener = null;
-
-    sessionCode = code;
-    isReadonly = true;
-    showView("hostView");
-    updateHostUI();
-
-    // Cargar una sola vez (sin listener en tiempo real)
-    const snap = await db.ref(`orders/${code}`).get();
-    const orders = snap.exists() ? Object.values(snap.val()) : [];
-    const meta = (await db.ref(`sessions/${code}`).get()).val();
-    document.getElementById("statusBar").innerHTML =
-      `📂 Viendo historial: ${meta?.label || code}`;
-    renderDashboard(orders);
-  }
-
-  // ── LINK ──
-  function copyLink() {
-    const link = document.getElementById("linkDisplay").textContent;
-    const btn = document.getElementById("copyBtn");
-    const copy = () => { btn.textContent="¡Copiado! ✓"; setTimeout(()=>btn.textContent="Copiar link",2500); };
-    navigator.clipboard?.writeText(link).then(copy).catch(() => {
-      const ta = document.createElement("textarea");
-      ta.value=link; document.body.appendChild(ta); ta.select();
-      document.execCommand("copy"); document.body.removeChild(ta); copy();
-    });
-  }
-
-  // ── CLIENT ──
-  function showClientView() {
-    showView("clientView");
-    document.getElementById("empanadasList").innerHTML = SABORES.map((s,i)=>`
-      <div class="emp-row">
-        <span class="emp-name">${esc(s)}</span>
-        <div class="qty-ctrl">
-          <button class="qty-btn" onclick="chg(${i},-1)">−</button>
-          <span class="qty-val" id="q${i}">0</span>
-          <button class="qty-btn" onclick="chg(${i},1)">+</button>
-        </div>
-      </div>`).join("");
-  }
-
-  function chg(i,d) {
-    const el = document.getElementById("q"+i);
-    el.textContent = Math.max(0, +el.textContent+d);
-  }
-
-  async function submitOrder() {
-    const nick = document.getElementById("nicknameInput").value.trim();
-    if (!nick) { alert("Por favor ingresá tu nickname."); return; }
-    const pedido={}; let total=0;
-    SABORES.forEach((s,i)=>{ const q=+document.getElementById("q"+i).textContent; if(q>0){pedido[s]=q;total+=q;} });
-    if (!total) { alert("Seleccioná al menos una empanada."); return; }
-
-    const btn = document.getElementById("submitBtn");
-    btn.innerHTML=`<span class="spinner"></span>&nbsp;Guardando…`; btn.disabled=true;
-
-    try {
-      // La key se deriva del nickname → si la misma persona manda de nuevo, pisa el pedido anterior
-      const key = nickToKey(nick);
-      await db.ref(`orders/${sessionCode}/${key}`).set({ nick, pedido, total, ts: Date.now() });
-      showView("successView");
-    } catch {
-      alert("Error al guardar. Revisá tu conexión e intentá de nuevo.");
-      btn.innerHTML="Guardar pedido ✓"; btn.disabled=false;
-    }
-  }
-
-  // ── DETAIL MODAL ──
-  async function showDetail(nick) {
-    const snap = await db.ref(`orders/${sessionCode}`).get();
-    const data = snap.val() || {};
-    const o = Object.values(data).find(x => x.nick === nick);
-    if (!o) return;
-    document.getElementById("detailName").textContent = nick;
-    document.getElementById("detailRows").innerHTML = Object.entries(o.pedido)
-      .map(([s,q])=>`<div class="detail-row"><span>${esc(s)}</span><span><strong>${q}</strong></span></div>`).join("");
-    document.getElementById("detailTotal").textContent = `${o.total} 🫓`;
-    document.getElementById("detailModal").classList.add("open");
-  }
-
-  // ── UTILS ──
-  function genCode() { return Math.random().toString(36).substr(2,8).toUpperCase(); }
-  function nickToKey(nick) { return nick.toLowerCase().replace(/[^a-z0-9]/g,"_"); }
-  function closeMO(id, e) {
-    if (!e || e.target===document.getElementById(id))
-      document.getElementById(id).classList.remove("open");
-  }
-  function esc(s) {
-    return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
-  }
-
-  init();
-</script>
+<script src="app.js"></script>
 </body>
 </html>
