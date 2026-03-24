@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pedidos de Empanadas 🫓</title>
+
+<!-- Firebase v8 compat (no requiere bundler, funciona en HTML estático) -->
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Segoe UI',sans-serif;background:#f7f7f5;color:#1a1a1a;min-height:100vh}
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:10px 18px;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;transition:all .15s}
+  .btn:disabled{opacity:.5;cursor:not-allowed}
+  .btn-primary{background:#1a1a1a;color:#fff}.btn-primary:hover:not(:disabled){background:#333}
+  .btn-danger{background:#fff;color:#c0392b;border:1.5px solid #c0392b}.btn-danger:hover:not(:disabled){background:#c0392b;color:#fff}
+  .btn-success{background:#2ecc71;color:#fff}.btn-success:hover:not(:disabled){background:#27ae60}
+  .badge{display:inline-block;background:#f0f0ee;color:#555;border-radius:99px;font-size:12px;padding:2px 9px;font-weight:600}
+
+  .view{display:none;min-height:100vh;flex-direction:column}
+  .view.active{display:flex}
+
+  /* LANDING */
+  #landingView{align-items:center;justify-content:center;text-align:center;padding:32px}
+  #landingView h1{font-size:30px;font-weight:800;margin-bottom:8px}
+  #landingView h1 span{color:#e67e22}
+  #landingView p{color:#888;font-size:15px;margin-bottom:28px}
+
+  /* HOST */
+  #hostView{flex-direction:column}
+  .host-header{background:#fff;border-bottom:1px solid #e8e8e5;padding:18px 28px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px}
+  .host-header h1{font-size:19px;font-weight:700}.host-header h1 span{color:#e67e22}
+  .status-bar{font-size:12px;color:#999;padding:6px 28px;background:#f7f7f5;border-bottom:1px solid #e8e8e5;display:flex;align-items:center;gap:6px}
+  .link-bar{background:#fff;padding:16px 28px;display:flex;gap:10px;align-items:center;border-bottom:1px solid #e8e8e5;flex-wrap:wrap}
+  .link-box{flex:1;background:#f7f7f5;border:1.5px solid #e8e8e5;border-radius:8px;padding:9px 13px;font-size:13px;color:#444;font-family:monospace;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;min-width:0}
+  .main-content{padding:24px 28px;flex:1}
+  .section-title{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#999;margin-bottom:14px}
+  .summary-grid{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:28px}
+  .summary-card{background:#fff;border:1.5px solid #e8e8e5;border-radius:10px;padding:10px 16px;display:flex;align-items:center;gap:10px;min-width:175px}
+  .summary-card .sabor{font-size:13px;font-weight:600}
+  .summary-card .count{font-size:22px;font-weight:800;color:#e67e22;margin-left:auto}
+  .table-wrap{background:#fff;border:1.5px solid #e8e8e5;border-radius:12px;overflow:hidden}
+  table{width:100%;border-collapse:collapse}
+  thead th{background:#f7f7f5;padding:10px 16px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#999;border-bottom:1.5px solid #e8e8e5}
+  tbody tr{border-bottom:1px solid #f0f0ee;transition:background .1s}
+  tbody tr:last-child{border-bottom:none}
+  tbody tr:hover{background:#fafaf8}
+  td{padding:12px 16px;font-size:14px}
+  .nick-btn{font-weight:700;cursor:pointer;border-bottom:1.5px dashed #ccc;background:none;border-top:none;border-left:none;border-right:none;font-size:14px;font-family:inherit;padding:0;color:#1a1a1a}
+  .nick-btn:hover{color:#e67e22;border-color:#e67e22}
+  .empty-state{text-align:center;padding:40px;color:#bbb;font-size:14px}
+
+  /* CLIENT */
+  #clientView{align-items:center}
+  .client-inner{width:100%;max-width:520px;padding:28px 16px}
+  .client-header{text-align:center;margin-bottom:24px}
+  .client-header h1{font-size:24px;font-weight:800;margin-bottom:6px}
+  .client-header h1 span{color:#e67e22}
+  .client-header p{color:#888;font-size:14px}
+  .form-card{background:#fff;border:1.5px solid #e8e8e5;border-radius:14px;padding:22px;margin-bottom:14px}
+  .form-card label{display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#999;margin-bottom:8px}
+  .form-card input[type=text]{width:100%;padding:10px 13px;border:1.5px solid #e8e8e5;border-radius:8px;font-size:15px;outline:none;transition:border .15s}
+  .form-card input[type=text]:focus{border-color:#e67e22}
+  .emp-row{display:flex;align-items:center;justify-content:space-between;padding:9px 0;border-bottom:1px solid #f0f0ee}
+  .emp-row:last-child{border-bottom:none}
+  .emp-name{font-size:14px;font-weight:500}
+  .qty-ctrl{display:flex;align-items:center;gap:10px}
+  .qty-btn{width:28px;height:28px;border-radius:8px;border:1.5px solid #e8e8e5;background:#fff;font-size:17px;cursor:pointer;font-weight:700;color:#555;display:flex;align-items:center;justify-content:center;transition:all .1s}
+  .qty-btn:hover{background:#1a1a1a;color:#fff;border-color:#1a1a1a}
+  .qty-val{min-width:22px;text-align:center;font-size:15px;font-weight:700}
+  .submit-btn{width:100%;padding:14px;font-size:16px;border-radius:10px}
+
+  /* SUCCESS */
+  #successView{align-items:center;justify-content:center;text-align:center;padding:32px}
+  #successView .emoji{font-size:64px;margin-bottom:16px}
+  #successView h2{font-size:24px;font-weight:800;margin-bottom:8px}
+  #successView p{color:#888;font-size:15px}
+
+  /* INVALID */
+  #invalidView{align-items:center;justify-content:center;text-align:center;padding:32px}
+  #invalidView .emoji{font-size:56px;margin-bottom:16px}
+  #invalidView h2{font-size:22px;font-weight:800;margin-bottom:8px}
+  #invalidView p{color:#888;font-size:14px}
+
+  /* MODALS */
+  .modal-overlay{position:fixed;inset:0;z-index:200;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.4)}
+  .modal-overlay.open{display:flex}
+  .modal{background:#fff;border-radius:16px;padding:28px;max-width:440px;width:92%;box-shadow:0 20px 60px rgba(0,0,0,.2)}
+  .modal h3{font-size:17px;font-weight:700;margin-bottom:14px}
+  .modal-close{margin-top:16px;width:100%}
+  .detail-row{display:flex;justify-content:space-between;padding:6px 0;font-size:14px;border-bottom:1px solid #f0f0ee}
+  .detail-row:last-of-type{border-bottom:none}
+  .detail-total{margin-top:12px;font-weight:700;font-size:14px;display:flex;justify-content:space-between}
+
+  .spinner{display:inline-block;width:15px;height:15px;border:2px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;animation:spin .6s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .dot{width:8px;height:8px;border-radius:50%;background:#2ecc71;display:inline-block;animation:pulse 1.5s infinite;flex-shrink:0}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+</style>
+</head>
+<body>
+
+<!-- LANDING (organizador) -->
+<div id="landingView" class="view">
+  <div style="font-size:52px;margin-bottom:16px">🫓</div>
+  <h1>Pedidos de <span>Empanadas</span></h1>
+  <p>Organizá el pedido grupal fácil y rápido.</p>
+  <button class="btn btn-primary" style="font-size:16px;padding:14px 36px" onclick="goHost()">
+    Soy el organizador →
+  </button>
+</div>
+
+<!-- HOST PANEL -->
+<div id="hostView" class="view">
+  <div class="host-header">
+    <h1>🫓 Panel <span>Organizador</span></h1>
+    <div style="display:flex;gap:10px;flex-wrap:wrap">
+      <button class="btn btn-danger" onclick="resetDashboard()">🗑 Reiniciar</button>
+    </div>
+  </div>
+  <div class="status-bar" id="statusBar"><span class="dot"></span>&nbsp;Conectado — actualizando en tiempo real</div>
+  <div class="link-bar">
+    <span style="font-size:13px;font-weight:600;white-space:nowrap">🔗 Link para amigos:</span>
+    <div class="link-box" id="linkDisplay">Generando…</div>
+    <button class="btn btn-success" id="copyBtn" onclick="copyLink()">Copiar link</button>
+  </div>
+  <div class="main-content">
+    <div class="section-title">Resumen por sabor</div>
+    <div class="summary-grid" id="summaryGrid">
+      <div class="empty-state" style="width:100%;padding:16px">Sin pedidos aún.</div>
+    </div>
+    <div class="section-title" style="margin-top:4px">Pedidos por persona</div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Nickname</th><th>Total empanadas</th></tr></thead>
+        <tbody id="ordersBody">
+          <tr><td colspan="2" class="empty-state">Nadie pidió todavía.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- CLIENT (amigos) -->
+<div id="clientView" class="view" style="align-items:center">
+  <div class="client-inner">
+    <div class="client-header">
+      <div style="font-size:44px;margin-bottom:10px">🫓</div>
+      <h1>Pedido de <span>Empanadas</span></h1>
+      <p>Elegí tus sabores y guardá tu pedido.</p>
+    </div>
+    <div class="form-card">
+      <label>Tu nickname</label>
+      <input type="text" id="nicknameInput" placeholder="Ej: Gastón, La Rusa, Pelado…" maxlength="30">
+    </div>
+    <div class="form-card">
+      <label>¿Qué empanadas querés?</label>
+      <div id="empanadasList"></div>
+    </div>
+    <button class="btn btn-success submit-btn" id="submitBtn" onclick="submitOrder()">
+      Guardar pedido ✓
+    </button>
+  </div>
+</div>
+
+<!-- SUCCESS -->
+<div id="successView" class="view">
+  <div class="emoji">✅</div>
+  <h2>¡Pedido guardado!</h2>
+  <p>Tu pedido fue registrado.<br>Podés cerrar esta página.</p>
+</div>
+
+<!-- INVALID SESSION -->
+<div id="invalidView" class="view">
+  <div class="emoji">🔒</div>
+  <h2>Link inválido</h2>
+  <p>Este link no existe o ya fue reiniciado.<br>Pedile uno nuevo al organizador.</p>
+</div>
+
+<!-- DETAIL MODAL -->
+<div class="modal-overlay" id="detailModal" onclick="closeModal(event)">
+  <div class="modal">
+    <h3>Pedido de <span id="detailName" style="color:#e67e22"></span></h3>
+    <div id="detailRows"></div>
+    <div class="detail-total"><span>Total</span><span id="detailTotal"></span></div>
+    <button class="btn btn-primary modal-close" onclick="document.getElementById('detailModal').classList.remove('open')">Cerrar</button>
+  </div>
+</div>
+
+<script>
+  // ──────────────────────────────────────────────
+  // 🔧 REEMPLAZÁ ESTO CON TU CONFIGURACIÓN FIREBASE
+  // ──────────────────────────────────────────────
+const firebaseConfig = {
+  apiKey: "AIzaSyACR4RYlOgUp2t9x5ttKqNcYLN_KEQvIqg",
+  authDomain: "empanadas-app-7502e.firebaseapp.com",
+  databaseURL: "https://empanadas-app-7502e-default-rtdb.firebaseio.com",
+  projectId: "empanadas-app-7502e",
+  storageBucket: "empanadas-app-7502e.firebasestorage.app",
+  messagingSenderId: "755178755806",
+  appId: "1:755178755806:web:d53f860165dac8f972544f",
+  measurementId: "G-08XV8R7EE9"
+};
+  // ──────────────────────────────────────────────
+
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.database();
+
+  const SABORES = [
+    "Carne suave","Carne picante","Carne dulce","Carne picada suave",
+    "Pollo picante","Pollo suave","Jamón y queso","Cebolla y queso",
+    "Roquefort","Roquefort y jamón","Brócoli y ricota","Primavera",
+    "Capresse","Calabresa","Verdura y salsa blanca","Humita",
+    "Humita y mozzarella","Atún","Ciruela y panceta","Cheeseburguer"
+  ];
+
+  let sessionCode = null;
+  let ordersListener = null;
+
+  // ── ROUTING ──
+  // El link que se comparte es: https://usuario.github.io/empanadas/?code=ABC123
+  // Si hay ?code en la URL → vista de cliente (amigo)
+  // Si no hay → vista de organizador
+  async function init() {
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get("code");
+    if (code) {
+      // Verificar que el código existe en Firebase
+      const snap = await db.ref(`sessions/${code}`).get();
+      if (snap.exists()) {
+        sessionCode = code;
+        showClientView();
+      } else {
+        showView("invalidView");
+      }
+    } else {
+      showView("landingView");
+    }
+  }
+
+  // ── VIEWS ──
+  function showView(id) {
+    document.querySelectorAll(".view").forEach(v => v.classList.remove("active"));
+    document.getElementById(id).classList.add("active");
+  }
+
+  // ── HOST ──
+  async function goHost() {
+    showView("hostView");
+    // Generar código único de sesión
+    sessionCode = Math.random().toString(36).substr(2, 8).toUpperCase();
+    // Crear sesión en Firebase
+    await db.ref(`sessions/${sessionCode}`).set({ createdAt: Date.now() });
+    // Mostrar link para compartir
+    const link = `${window.location.origin}${window.location.pathname}?code=${sessionCode}`;
+    document.getElementById("linkDisplay").textContent = link;
+    // Escuchar pedidos en tiempo real
+    listenOrders();
+  }
+
+  function listenOrders() {
+    if (ordersListener) ordersListener(); // detach previo
+    const ref = db.ref(`orders/${sessionCode}`);
+    ref.on("value", snap => {
+      const data = snap.val() || {};
+      const orders = Object.values(data);
+      renderDashboard(orders);
+    });
+  }
+
+  function renderDashboard(orders) {
+    // Resumen por sabor
+    const totals = {};
+    orders.forEach(o => Object.entries(o.pedido).forEach(([s,q]) => totals[s]=(totals[s]||0)+q));
+    const grid = document.getElementById("summaryGrid");
+    grid.innerHTML = Object.keys(totals).length
+      ? Object.entries(totals).sort((a,b)=>b[1]-a[1])
+          .map(([s,q])=>`<div class="summary-card"><span class="sabor">${esc(s)}</span><span class="count">${q}</span></div>`).join("")
+      : `<div class="empty-state" style="width:100%;padding:16px">Sin pedidos aún.</div>`;
+
+    // Tabla por persona
+    const tbody = document.getElementById("ordersBody");
+    tbody.innerHTML = orders.length
+      ? orders.sort((a,b)=>a.ts-b.ts).map(o=>`<tr>
+          <td><button class="nick-btn" onclick="showDetail('${esc(o.nick)}')">${esc(o.nick)}</button></td>
+          <td><span class="badge">${o.total} 🫓</span></td>
+        </tr>`).join("")
+      : `<tr><td colspan="2" class="empty-state">Nadie pidió todavía.</td></tr>`;
+
+    document.getElementById("statusBar").innerHTML =
+      `<span class="dot"></span>&nbsp;En vivo · Última actualización: ${new Date().toLocaleTimeString("es-AR")}`;
+  }
+
+  async function resetDashboard() {
+    if (!confirm("¿Borrás todos los pedidos y generás un link nuevo?")) return;
+    // Borrar pedidos actuales
+    await db.ref(`orders/${sessionCode}`).remove();
+    // Nuevo código de sesión → el link viejo queda inválido
+    const oldCode = sessionCode;
+    sessionCode = Math.random().toString(36).substr(2, 8).toUpperCase();
+    await db.ref(`sessions/${sessionCode}`).set({ createdAt: Date.now() });
+    await db.ref(`sessions/${oldCode}`).remove();
+    // Actualizar link
+    const link = `${window.location.origin}${window.location.pathname}?code=${sessionCode}`;
+    document.getElementById("linkDisplay").textContent = link;
+    // Re-escuchar con nuevo código
+    db.ref(`orders/${oldCode}`).off();
+    listenOrders();
+  }
+
+  function copyLink() {
+    const link = document.getElementById("linkDisplay").textContent;
+    const btn = document.getElementById("copyBtn");
+    navigator.clipboard.writeText(link)
+      .then(() => { btn.textContent = "¡Copiado! ✓"; setTimeout(() => btn.textContent = "Copiar link", 2500); })
+      .catch(() => {
+        // fallback
+        const ta = document.createElement("textarea");
+        ta.value = link; document.body.appendChild(ta); ta.select();
+        document.execCommand("copy");
+        document.body.removeChild(ta);
+        btn.textContent = "¡Copiado! ✓"; setTimeout(() => btn.textContent = "Copiar link", 2500);
+      });
+  }
+
+  // ── CLIENT ──
+  function showClientView() {
+    showView("clientView");
+    document.getElementById("empanadasList").innerHTML = SABORES.map((s,i)=>`
+      <div class="emp-row">
+        <span class="emp-name">${esc(s)}</span>
+        <div class="qty-ctrl">
+          <button class="qty-btn" onclick="chg(${i},-1)">−</button>
+          <span class="qty-val" id="q${i}">0</span>
+          <button class="qty-btn" onclick="chg(${i},1)">+</button>
+        </div>
+      </div>`).join("");
+  }
+
+  function chg(i,d) {
+    const el = document.getElementById("q"+i);
+    el.textContent = Math.max(0, +el.textContent + d);
+  }
+
+  async function submitOrder() {
+    const nick = document.getElementById("nicknameInput").value.trim();
+    if (!nick) { alert("Por favor ingresá tu nickname."); return; }
+    const pedido = {}; let total = 0;
+    SABORES.forEach((s,i) => {
+      const q = +document.getElementById("q"+i).textContent;
+      if (q > 0) { pedido[s] = q; total += q; }
+    });
+    if (!total) { alert("Seleccioná al menos una empanada."); return; }
+
+    const btn = document.getElementById("submitBtn");
+    btn.innerHTML = `<span class="spinner"></span>&nbsp;Guardando…`; btn.disabled = true;
+
+    try {
+      // Usamos el nick como key para sobrescribir si la misma persona vuelve a pedir
+      const key = nick.toLowerCase().replace(/[^a-z0-9]/g, "_");
+      await db.ref(`orders/${sessionCode}/${key}`).set({ nick, pedido, total, ts: Date.now() });
+      showView("successView");
+    } catch(e) {
+      alert("Error al guardar. Revisá tu conexión e intentá de nuevo.");
+      btn.innerHTML = "Guardar pedido ✓"; btn.disabled = false;
+    }
+  }
+
+  // ── DETAIL MODAL ──
+  async function showDetail(nick) {
+    const snap = await db.ref(`orders/${sessionCode}`).get();
+    const data = snap.val() || {};
+    const o = Object.values(data).find(x => x.nick === nick);
+    if (!o) return;
+    document.getElementById("detailName").textContent = nick;
+    document.getElementById("detailRows").innerHTML = Object.entries(o.pedido)
+      .map(([s,q])=>`<div class="detail-row"><span>${esc(s)}</span><span><strong>${q}</strong></span></div>`).join("");
+    document.getElementById("detailTotal").textContent = `${o.total} 🫓`;
+    document.getElementById("detailModal").classList.add("open");
+  }
+
+  function closeModal(e) {
+    if (e.target === document.getElementById("detailModal"))
+      document.getElementById("detailModal").classList.remove("open");
+  }
+
+  function esc(s) {
+    return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+  }
+
+  init();
+</script>
+</body>
+</html>
