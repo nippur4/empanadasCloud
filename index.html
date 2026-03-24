@@ -4,11 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Pedidos de Empanadas 🫓</title>
-
-<!-- Firebase v8 compat (no requiere bundler, funciona en HTML estático) -->
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
-
 <style>
   *{box-sizing:border-box;margin:0;padding:0}
   body{font-family:'Segoe UI',sans-serif;background:#f7f7f5;color:#1a1a1a;min-height:100vh}
@@ -17,6 +14,7 @@
   .btn-primary{background:#1a1a1a;color:#fff}.btn-primary:hover:not(:disabled){background:#333}
   .btn-danger{background:#fff;color:#c0392b;border:1.5px solid #c0392b}.btn-danger:hover:not(:disabled){background:#c0392b;color:#fff}
   .btn-success{background:#2ecc71;color:#fff}.btn-success:hover:not(:disabled){background:#27ae60}
+  .btn-sm{padding:5px 10px;font-size:12px;border-radius:6px}
   .badge{display:inline-block;background:#f0f0ee;color:#555;border-radius:99px;font-size:12px;padding:2px 9px;font-weight:600}
 
   .view{display:none;min-height:100vh;flex-direction:column}
@@ -32,6 +30,7 @@
   #hostView{flex-direction:column}
   .host-header{background:#fff;border-bottom:1px solid #e8e8e5;padding:18px 28px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px}
   .host-header h1{font-size:19px;font-weight:700}.host-header h1 span{color:#e67e22}
+  .header-actions{display:flex;gap:10px;flex-wrap:wrap}
   .status-bar{font-size:12px;color:#999;padding:6px 28px;background:#f7f7f5;border-bottom:1px solid #e8e8e5;display:flex;align-items:center;gap:6px}
   .link-bar{background:#fff;padding:16px 28px;display:flex;gap:10px;align-items:center;border-bottom:1px solid #e8e8e5;flex-wrap:wrap}
   .link-box{flex:1;background:#f7f7f5;border:1.5px solid #e8e8e5;border-radius:8px;padding:9px 13px;font-size:13px;color:#444;font-family:monospace;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;min-width:0}
@@ -47,10 +46,11 @@
   tbody tr{border-bottom:1px solid #f0f0ee;transition:background .1s}
   tbody tr:last-child{border-bottom:none}
   tbody tr:hover{background:#fafaf8}
-  td{padding:12px 16px;font-size:14px}
+  td{padding:11px 16px;font-size:14px;vertical-align:middle}
   .nick-btn{font-weight:700;cursor:pointer;border-bottom:1.5px dashed #ccc;background:none;border-top:none;border-left:none;border-right:none;font-size:14px;font-family:inherit;padding:0;color:#1a1a1a}
   .nick-btn:hover{color:#e67e22;border-color:#e67e22}
   .empty-state{text-align:center;padding:40px;color:#bbb;font-size:14px}
+  .readonly-badge{display:inline-block;background:#fff3cd;color:#856404;border:1px solid #ffc107;border-radius:6px;font-size:11px;font-weight:700;padding:2px 8px;margin-left:8px}
 
   /* CLIENT */
   #clientView{align-items:center}
@@ -72,27 +72,30 @@
   .qty-val{min-width:22px;text-align:center;font-size:15px;font-weight:700}
   .submit-btn{width:100%;padding:14px;font-size:16px;border-radius:10px}
 
-  /* SUCCESS */
-  #successView{align-items:center;justify-content:center;text-align:center;padding:32px}
-  #successView .emoji{font-size:64px;margin-bottom:16px}
-  #successView h2{font-size:24px;font-weight:800;margin-bottom:8px}
-  #successView p{color:#888;font-size:15px}
-
-  /* INVALID */
-  #invalidView{align-items:center;justify-content:center;text-align:center;padding:32px}
-  #invalidView .emoji{font-size:56px;margin-bottom:16px}
-  #invalidView h2{font-size:22px;font-weight:800;margin-bottom:8px}
-  #invalidView p{color:#888;font-size:14px}
+  /* SUCCESS / INVALID */
+  #successView,#invalidView{align-items:center;justify-content:center;text-align:center;padding:32px}
+  .big-emoji{font-size:64px;margin-bottom:16px}
+  .big-title{font-size:24px;font-weight:800;margin-bottom:8px}
+  .big-sub{color:#888;font-size:15px}
 
   /* MODALS */
-  .modal-overlay{position:fixed;inset:0;z-index:200;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.4)}
+  .modal-overlay{position:fixed;inset:0;z-index:200;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.45);padding:16px}
   .modal-overlay.open{display:flex}
-  .modal{background:#fff;border-radius:16px;padding:28px;max-width:440px;width:92%;box-shadow:0 20px 60px rgba(0,0,0,.2)}
-  .modal h3{font-size:17px;font-weight:700;margin-bottom:14px}
+  .modal{background:#fff;border-radius:16px;padding:28px;max-width:480px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.2);max-height:90vh;overflow-y:auto}
+  .modal h3{font-size:17px;font-weight:700;margin-bottom:16px}
   .modal-close{margin-top:16px;width:100%}
+
+  /* detail modal */
   .detail-row{display:flex;justify-content:space-between;padding:6px 0;font-size:14px;border-bottom:1px solid #f0f0ee}
   .detail-row:last-of-type{border-bottom:none}
   .detail-total{margin-top:12px;font-weight:700;font-size:14px;display:flex;justify-content:space-between}
+
+  /* history modal */
+  .hist-item{display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid #f0f0ee;gap:10px}
+  .hist-item:last-child{border-bottom:none}
+  .hist-info .hist-date{font-size:13px;font-weight:600}
+  .hist-info .hist-code{font-size:11px;color:#999;font-family:monospace;margin-top:2px}
+  .hist-info .hist-count{font-size:11px;color:#e67e22;margin-top:2px}
 
   .spinner{display:inline-block;width:15px;height:15px;border:2px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;animation:spin .6s linear infinite}
   @keyframes spin{to{transform:rotate(360deg)}}
@@ -102,7 +105,7 @@
 </head>
 <body>
 
-<!-- LANDING (organizador) -->
+<!-- LANDING -->
 <div id="landingView" class="view">
   <div style="font-size:52px;margin-bottom:16px">🫓</div>
   <h1>Pedidos de <span>Empanadas</span></h1>
@@ -115,13 +118,14 @@
 <!-- HOST PANEL -->
 <div id="hostView" class="view">
   <div class="host-header">
-    <h1>🫓 Panel <span>Organizador</span></h1>
-    <div style="display:flex;gap:10px;flex-wrap:wrap">
-      <button class="btn btn-danger" onclick="resetDashboard()">🗑 Reiniciar</button>
+    <h1>🫓 Panel <span>Organizador</span> <span id="readonlyBadge" class="readonly-badge" style="display:none">HISTORIAL — sólo lectura</span></h1>
+    <div class="header-actions">
+      <button class="btn btn-primary" onclick="openHistoryModal()">📂 Historial</button>
+      <button class="btn btn-danger" id="resetBtn" onclick="resetDashboard()">🗑 Reiniciar</button>
     </div>
   </div>
   <div class="status-bar" id="statusBar"><span class="dot"></span>&nbsp;Conectado — actualizando en tiempo real</div>
-  <div class="link-bar">
+  <div class="link-bar" id="linkBar">
     <span style="font-size:13px;font-weight:600;white-space:nowrap">🔗 Link para amigos:</span>
     <div class="link-box" id="linkDisplay">Generando…</div>
     <button class="btn btn-success" id="copyBtn" onclick="copyLink()">Copiar link</button>
@@ -134,16 +138,16 @@
     <div class="section-title" style="margin-top:4px">Pedidos por persona</div>
     <div class="table-wrap">
       <table>
-        <thead><tr><th>Nickname</th><th>Total empanadas</th></tr></thead>
+        <thead><tr><th>Nickname</th><th>Total</th><th id="actionsHeader"></th></tr></thead>
         <tbody id="ordersBody">
-          <tr><td colspan="2" class="empty-state">Nadie pidió todavía.</td></tr>
+          <tr><td colspan="3" class="empty-state">Nadie pidió todavía.</td></tr>
         </tbody>
       </table>
     </div>
   </div>
 </div>
 
-<!-- CLIENT (amigos) -->
+<!-- CLIENT -->
 <div id="clientView" class="view" style="align-items:center">
   <div class="client-inner">
     <div class="client-header">
@@ -159,51 +163,57 @@
       <label>¿Qué empanadas querés?</label>
       <div id="empanadasList"></div>
     </div>
-    <button class="btn btn-success submit-btn" id="submitBtn" onclick="submitOrder()">
-      Guardar pedido ✓
-    </button>
+    <button class="btn btn-success submit-btn" id="submitBtn" onclick="submitOrder()">Guardar pedido ✓</button>
   </div>
 </div>
 
 <!-- SUCCESS -->
 <div id="successView" class="view">
-  <div class="emoji">✅</div>
-  <h2>¡Pedido guardado!</h2>
-  <p>Tu pedido fue registrado.<br>Podés cerrar esta página.</p>
+  <div class="big-emoji">✅</div>
+  <h2 class="big-title">¡Pedido guardado!</h2>
+  <p class="big-sub">Tu pedido fue registrado.<br>Podés cerrar esta página.</p>
 </div>
 
-<!-- INVALID SESSION -->
+<!-- INVALID -->
 <div id="invalidView" class="view">
-  <div class="emoji">🔒</div>
-  <h2>Link inválido</h2>
-  <p>Este link no existe o ya fue reiniciado.<br>Pedile uno nuevo al organizador.</p>
+  <div class="big-emoji">🔒</div>
+  <h2 class="big-title">Link inválido</h2>
+  <p class="big-sub">Este link no existe o ya fue reiniciado.<br>Pedile uno nuevo al organizador.</p>
 </div>
 
 <!-- DETAIL MODAL -->
-<div class="modal-overlay" id="detailModal" onclick="closeModal(event)">
+<div class="modal-overlay" id="detailModal" onclick="closeMO('detailModal',event)">
   <div class="modal">
     <h3>Pedido de <span id="detailName" style="color:#e67e22"></span></h3>
     <div id="detailRows"></div>
     <div class="detail-total"><span>Total</span><span id="detailTotal"></span></div>
-    <button class="btn btn-primary modal-close" onclick="document.getElementById('detailModal').classList.remove('open')">Cerrar</button>
+    <button class="btn btn-primary modal-close" onclick="closeMO('detailModal')">Cerrar</button>
+  </div>
+</div>
+
+<!-- HISTORY MODAL -->
+<div class="modal-overlay" id="historyModal" onclick="closeMO('historyModal',event)">
+  <div class="modal">
+    <h3>📂 Historial de pedidos</h3>
+    <div id="historyList"><p style="color:#bbb;font-size:14px;text-align:center;padding:20px">Cargando…</p></div>
+    <button class="btn btn-primary modal-close" onclick="closeMO('historyModal')">Cerrar</button>
   </div>
 </div>
 
 <script>
-  // ──────────────────────────────────────────────
-  // 🔧 REEMPLAZÁ ESTO CON TU CONFIGURACIÓN FIREBASE
-  // ──────────────────────────────────────────────
-const firebaseConfig = {
-  apiKey: "AIzaSyACR4RYlOgUp2t9x5ttKqNcYLN_KEQvIqg",
-  authDomain: "empanadas-app-7502e.firebaseapp.com",
-  databaseURL: "https://empanadas-app-7502e-default-rtdb.firebaseio.com",
-  projectId: "empanadas-app-7502e",
-  storageBucket: "empanadas-app-7502e.firebasestorage.app",
-  messagingSenderId: "755178755806",
-  appId: "1:755178755806:web:d53f860165dac8f972544f",
-  measurementId: "G-08XV8R7EE9"
-};
-  // ──────────────────────────────────────────────
+  // ──────────────────────────────────────────
+  // 🔧 REEMPLAZÁ CON TU CONFIGURACIÓN FIREBASE
+  // ──────────────────────────────────────────
+  const firebaseConfig = {
+    apiKey: "TU_API_KEY",
+    authDomain: "TU_PROJECT.firebaseapp.com",
+    databaseURL: "https://TU_PROJECT-default-rtdb.firebaseio.com",
+    projectId: "TU_PROJECT_ID",
+    storageBucket: "TU_PROJECT.appspot.com",
+    messagingSenderId: "TU_SENDER_ID",
+    appId: "TU_APP_ID"
+  };
+  // ──────────────────────────────────────────
 
   firebase.initializeApp(firebaseConfig);
   const db = firebase.database();
@@ -217,17 +227,14 @@ const firebaseConfig = {
   ];
 
   let sessionCode = null;
-  let ordersListener = null;
+  let isReadonly = false;  // true cuando se visualiza historial
+  let currentOrdersListener = null;
 
   // ── ROUTING ──
-  // El link que se comparte es: https://usuario.github.io/empanadas/?code=ABC123
-  // Si hay ?code en la URL → vista de cliente (amigo)
-  // Si no hay → vista de organizador
   async function init() {
     const params = new URLSearchParams(window.location.search);
     const code = params.get("code");
     if (code) {
-      // Verificar que el código existe en Firebase
       const snap = await db.ref(`sessions/${code}`).get();
       if (snap.exists()) {
         sessionCode = code;
@@ -240,7 +247,6 @@ const firebaseConfig = {
     }
   }
 
-  // ── VIEWS ──
   function showView(id) {
     document.querySelectorAll(".view").forEach(v => v.classList.remove("active"));
     document.getElementById(id).classList.add("active");
@@ -248,25 +254,41 @@ const firebaseConfig = {
 
   // ── HOST ──
   async function goHost() {
+    isReadonly = false;
     showView("hostView");
-    // Generar código único de sesión
-    sessionCode = Math.random().toString(36).substr(2, 8).toUpperCase();
-    // Crear sesión en Firebase
-    await db.ref(`sessions/${sessionCode}`).set({ createdAt: Date.now() });
-    // Mostrar link para compartir
-    const link = `${window.location.origin}${window.location.pathname}?code=${sessionCode}`;
-    document.getElementById("linkDisplay").textContent = link;
-    // Escuchar pedidos en tiempo real
-    listenOrders();
+    sessionCode = genCode();
+    // Guardar sesión en Firebase con timestamp y label legible
+    const label = new Date().toLocaleString("es-AR", {day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"});
+    await db.ref(`sessions/${sessionCode}`).set({ createdAt: Date.now(), label });
+    updateHostUI();
+    listenOrders(sessionCode);
   }
 
-  function listenOrders() {
-    if (ordersListener) ordersListener(); // detach previo
-    const ref = db.ref(`orders/${sessionCode}`);
-    ref.on("value", snap => {
+  function updateHostUI() {
+    // link bar
+    document.getElementById("linkBar").style.display = isReadonly ? "none" : "flex";
+    // reset btn
+    document.getElementById("resetBtn").style.display = isReadonly ? "none" : "inline-flex";
+    // readonly badge
+    document.getElementById("readonlyBadge").style.display = isReadonly ? "inline-block" : "none";
+    // acciones column header
+    document.getElementById("actionsHeader").textContent = isReadonly ? "" : "Acciones";
+    // link
+    if (!isReadonly) {
+      const link = `${window.location.origin}${window.location.pathname}?code=${sessionCode}`;
+      document.getElementById("linkDisplay").textContent = link;
+    }
+  }
+
+  function listenOrders(code) {
+    // Desuscribir listener anterior si existe
+    if (currentOrdersListener) {
+      db.ref(`orders/${currentOrdersListener}`).off();
+    }
+    currentOrdersListener = code;
+    db.ref(`orders/${code}`).on("value", snap => {
       const data = snap.val() || {};
-      const orders = Object.values(data);
-      renderDashboard(orders);
+      renderDashboard(Object.values(data));
     });
   }
 
@@ -282,47 +304,109 @@ const firebaseConfig = {
 
     // Tabla por persona
     const tbody = document.getElementById("ordersBody");
+    const colSpan = isReadonly ? 2 : 3;
     tbody.innerHTML = orders.length
-      ? orders.sort((a,b)=>a.ts-b.ts).map(o=>`<tr>
-          <td><button class="nick-btn" onclick="showDetail('${esc(o.nick)}')">${esc(o.nick)}</button></td>
-          <td><span class="badge">${o.total} 🫓</span></td>
-        </tr>`).join("")
-      : `<tr><td colspan="2" class="empty-state">Nadie pidió todavía.</td></tr>`;
+      ? orders.sort((a,b)=>a.ts-b.ts).map(o => {
+          const key = nickToKey(o.nick);
+          const deleteBtn = isReadonly ? "" :
+            `<button class="btn btn-danger btn-sm" onclick="deleteOrder('${esc(key)}','${esc(o.nick)}')">✕ Borrar</button>`;
+          return `<tr>
+            <td><button class="nick-btn" onclick="showDetail('${esc(o.nick)}')">${esc(o.nick)}</button></td>
+            <td><span class="badge">${o.total} 🫓</span></td>
+            <td>${deleteBtn}</td>
+          </tr>`;
+        }).join("")
+      : `<tr><td colspan="${colSpan}" class="empty-state">Nadie pidió todavía.</td></tr>`;
 
-    document.getElementById("statusBar").innerHTML =
-      `<span class="dot"></span>&nbsp;En vivo · Última actualización: ${new Date().toLocaleTimeString("es-AR")}`;
+    if (!isReadonly) {
+      document.getElementById("statusBar").innerHTML =
+        `<span class="dot"></span>&nbsp;En vivo · Última actualización: ${new Date().toLocaleTimeString("es-AR")}`;
+    }
   }
 
+  // ── BORRAR PEDIDO INDIVIDUAL ──
+  async function deleteOrder(key, nick) {
+    if (!confirm(`¿Borrar el pedido de "${nick}"?`)) return;
+    await db.ref(`orders/${sessionCode}/${key}`).remove();
+  }
+
+  // ── REINICIAR ──
   async function resetDashboard() {
     if (!confirm("¿Borrás todos los pedidos y generás un link nuevo?")) return;
-    // Borrar pedidos actuales
+    db.ref(`orders/${currentOrdersListener}`).off();
+    currentOrdersListener = null;
     await db.ref(`orders/${sessionCode}`).remove();
-    // Nuevo código de sesión → el link viejo queda inválido
-    const oldCode = sessionCode;
-    sessionCode = Math.random().toString(36).substr(2, 8).toUpperCase();
-    await db.ref(`sessions/${sessionCode}`).set({ createdAt: Date.now() });
-    await db.ref(`sessions/${oldCode}`).remove();
-    // Actualizar link
-    const link = `${window.location.origin}${window.location.pathname}?code=${sessionCode}`;
-    document.getElementById("linkDisplay").textContent = link;
-    // Re-escuchar con nuevo código
-    db.ref(`orders/${oldCode}`).off();
-    listenOrders();
+    // Mantener la sesión vieja en el historial pero crear una nueva
+    sessionCode = genCode();
+    const label = new Date().toLocaleString("es-AR",{day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"});
+    await db.ref(`sessions/${sessionCode}`).set({ createdAt: Date.now(), label });
+    isReadonly = false;
+    updateHostUI();
+    listenOrders(sessionCode);
   }
 
+  // ── HISTORIAL ──
+  async function openHistoryModal() {
+    document.getElementById("historyModal").classList.add("open");
+    document.getElementById("historyList").innerHTML = `<p style="color:#bbb;font-size:14px;text-align:center;padding:20px">Cargando…</p>`;
+
+    const snap = await db.ref("sessions").orderByChild("createdAt").get();
+    const sessions = [];
+    snap.forEach(child => sessions.push({ code: child.key, ...child.val() }));
+    sessions.reverse(); // más reciente primero
+
+    if (!sessions.length) {
+      document.getElementById("historyList").innerHTML = `<p style="color:#bbb;font-size:14px;text-align:center;padding:20px">No hay sesiones guardadas.</p>`;
+      return;
+    }
+
+    // Para cada sesión, contar cuántas personas pidieron
+    const counts = await Promise.all(sessions.map(async s => {
+      const o = await db.ref(`orders/${s.code}`).get();
+      return o.exists() ? Object.keys(o.val()).length : 0;
+    }));
+
+    document.getElementById("historyList").innerHTML = sessions.map((s, i) => `
+      <div class="hist-item">
+        <div class="hist-info">
+          <div class="hist-date">${s.label || "Sesión sin fecha"}</div>
+          <div class="hist-code">Código: ${s.code}</div>
+          <div class="hist-count">${counts[i]} persona${counts[i]!==1?"s":""} pidieron</div>
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="loadHistorySession('${s.code}')">Ver →</button>
+      </div>`).join("");
+  }
+
+  async function loadHistorySession(code) {
+    closeMO("historyModal");
+    // Desuscribir listener de tiempo real y cargar datos estáticos
+    if (currentOrdersListener) db.ref(`orders/${currentOrdersListener}`).off();
+    currentOrdersListener = null;
+
+    sessionCode = code;
+    isReadonly = true;
+    showView("hostView");
+    updateHostUI();
+
+    // Cargar una sola vez (sin listener en tiempo real)
+    const snap = await db.ref(`orders/${code}`).get();
+    const orders = snap.exists() ? Object.values(snap.val()) : [];
+    const meta = (await db.ref(`sessions/${code}`).get()).val();
+    document.getElementById("statusBar").innerHTML =
+      `📂 Viendo historial: ${meta?.label || code}`;
+    renderDashboard(orders);
+  }
+
+  // ── LINK ──
   function copyLink() {
     const link = document.getElementById("linkDisplay").textContent;
     const btn = document.getElementById("copyBtn");
-    navigator.clipboard.writeText(link)
-      .then(() => { btn.textContent = "¡Copiado! ✓"; setTimeout(() => btn.textContent = "Copiar link", 2500); })
-      .catch(() => {
-        // fallback
-        const ta = document.createElement("textarea");
-        ta.value = link; document.body.appendChild(ta); ta.select();
-        document.execCommand("copy");
-        document.body.removeChild(ta);
-        btn.textContent = "¡Copiado! ✓"; setTimeout(() => btn.textContent = "Copiar link", 2500);
-      });
+    const copy = () => { btn.textContent="¡Copiado! ✓"; setTimeout(()=>btn.textContent="Copiar link",2500); };
+    navigator.clipboard?.writeText(link).then(copy).catch(() => {
+      const ta = document.createElement("textarea");
+      ta.value=link; document.body.appendChild(ta); ta.select();
+      document.execCommand("copy"); document.body.removeChild(ta); copy();
+    });
   }
 
   // ── CLIENT ──
@@ -341,30 +425,27 @@ const firebaseConfig = {
 
   function chg(i,d) {
     const el = document.getElementById("q"+i);
-    el.textContent = Math.max(0, +el.textContent + d);
+    el.textContent = Math.max(0, +el.textContent+d);
   }
 
   async function submitOrder() {
     const nick = document.getElementById("nicknameInput").value.trim();
     if (!nick) { alert("Por favor ingresá tu nickname."); return; }
-    const pedido = {}; let total = 0;
-    SABORES.forEach((s,i) => {
-      const q = +document.getElementById("q"+i).textContent;
-      if (q > 0) { pedido[s] = q; total += q; }
-    });
+    const pedido={}; let total=0;
+    SABORES.forEach((s,i)=>{ const q=+document.getElementById("q"+i).textContent; if(q>0){pedido[s]=q;total+=q;} });
     if (!total) { alert("Seleccioná al menos una empanada."); return; }
 
     const btn = document.getElementById("submitBtn");
-    btn.innerHTML = `<span class="spinner"></span>&nbsp;Guardando…`; btn.disabled = true;
+    btn.innerHTML=`<span class="spinner"></span>&nbsp;Guardando…`; btn.disabled=true;
 
     try {
-      // Usamos el nick como key para sobrescribir si la misma persona vuelve a pedir
-      const key = nick.toLowerCase().replace(/[^a-z0-9]/g, "_");
+      // La key se deriva del nickname → si la misma persona manda de nuevo, pisa el pedido anterior
+      const key = nickToKey(nick);
       await db.ref(`orders/${sessionCode}/${key}`).set({ nick, pedido, total, ts: Date.now() });
       showView("successView");
-    } catch(e) {
+    } catch {
       alert("Error al guardar. Revisá tu conexión e intentá de nuevo.");
-      btn.innerHTML = "Guardar pedido ✓"; btn.disabled = false;
+      btn.innerHTML="Guardar pedido ✓"; btn.disabled=false;
     }
   }
 
@@ -381,11 +462,13 @@ const firebaseConfig = {
     document.getElementById("detailModal").classList.add("open");
   }
 
-  function closeModal(e) {
-    if (e.target === document.getElementById("detailModal"))
-      document.getElementById("detailModal").classList.remove("open");
+  // ── UTILS ──
+  function genCode() { return Math.random().toString(36).substr(2,8).toUpperCase(); }
+  function nickToKey(nick) { return nick.toLowerCase().replace(/[^a-z0-9]/g,"_"); }
+  function closeMO(id, e) {
+    if (!e || e.target===document.getElementById(id))
+      document.getElementById(id).classList.remove("open");
   }
-
   function esc(s) {
     return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
   }
