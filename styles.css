@@ -7,6 +7,7 @@ body{font-family:'Segoe UI',sans-serif;background:#f7f7f5;color:#1a1a1a;min-heig
 .btn-primary{background:#1a1a1a;color:#fff}.btn-primary:hover:not(:disabled){background:#333}
 .btn-danger{background:#fff;color:#c0392b;border:1.5px solid #c0392b}.btn-danger:hover:not(:disabled){background:#c0392b;color:#fff}
 .btn-success{background:#2ecc71;color:#fff}.btn-success:hover:not(:disabled){background:#27ae60}
+.btn-ghost{background:transparent;color:#666;border:1.5px solid #ddd}.btn-ghost:hover:not(:disabled){background:#f0f0ee;border-color:#bbb}
 .btn-sm{padding:5px 10px;font-size:12px;border-radius:6px}
 .badge{display:inline-block;background:#f0f0ee;color:#555;border-radius:99px;font-size:12px;padding:2px 9px;font-weight:600}
 
@@ -92,6 +93,24 @@ td{padding:11px 16px;font-size:14px;vertical-align:middle}
 .hist-date{font-size:13px;font-weight:600}
 .hist-code{font-size:11px;color:#999;font-family:monospace;margin-top:2px}
 .hist-count{font-size:11px;color:#e67e22;margin-top:2px}
+
+/* ── Nickname requerido ── */
+.nickname-card{border-left:3px solid #e67e22 !important;background:#fffbf7 !important}
+.nickname-label{display:flex !important;align-items:center;gap:8px;color:#e67e22 !important;font-size:12px !important;text-transform:uppercase;letter-spacing:.07em;font-weight:800 !important;margin-bottom:10px !important}
+.required-badge{background:#e67e22;color:#fff;font-size:9px;font-weight:800;border-radius:4px;padding:2px 7px;letter-spacing:.04em;flex-shrink:0}
+.nickname-help{font-size:11px;color:#bbb;margin-top:8px}
+.nickname-input-error{border-color:#c0392b !important;box-shadow:0 0 0 3px rgba(192,57,43,.12) !important}
+
+/* ── Link sutil cliente ── */
+.back-link-wrap{text-align:center;margin-top:14px}
+.back-link{background:none;border:none;color:#ccc;font-size:12px;cursor:pointer;padding:4px 8px;font-family:inherit;text-decoration:underline}
+.back-link:hover{color:#999}
+
+/* ── Total general ── */
+.total-strip{background:#fff7ee;border:1.5px solid #f0c080;border-radius:10px;padding:12px 20px;display:flex;align-items:center;gap:10px;margin-bottom:20px;flex-wrap:wrap}
+.total-strip-emoji{font-size:20px}
+.total-strip-count{font-size:26px;font-weight:800;color:#e67e22;line-height:1}
+.total-strip-text{font-size:13px;color:#999}
 
 /* ── Utilidades ── */
 .spinner{display:inline-block;width:15px;height:15px;border:2px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;animation:spin .6s linear infinite}

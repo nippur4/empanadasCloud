@@ -29,6 +29,7 @@
       <span id="readonlyBadge" class="readonly-badge" style="display:none">HISTORIAL — sólo lectura</span>
     </h1>
     <div class="header-actions">
+      <button class="btn btn-ghost" onclick="goHome()">← Inicio</button>
       <button class="btn btn-primary" onclick="openHistoryModal()">📂 Historial</button>
       <button class="btn btn-danger" id="resetBtn" onclick="resetDashboard()">🗑 Reiniciar</button>
     </div>
@@ -40,6 +41,12 @@
     <button class="btn btn-success" id="copyBtn" onclick="copyLink()">Copiar link</button>
   </div>
   <div class="main-content">
+    <div class="total-strip" id="totalStrip" style="display:none">
+      <span class="total-strip-emoji">📊</span>
+      <span class="total-strip-count" id="totalCount">0</span>
+      <span class="total-strip-text">empanadas en total</span>
+      <span class="total-strip-text" id="totalPeople"></span>
+    </div>
     <div class="section-title">Resumen por sabor</div>
     <div class="summary-grid" id="summaryGrid">
       <div class="empty-state" style="width:100%;padding:16px">Sin pedidos aún.</div>
@@ -64,9 +71,13 @@
       <h1>Pedido de <span>Empanadas</span></h1>
       <p>Elegí tus sabores y guardá tu pedido.</p>
     </div>
-    <div class="form-card">
-      <label>Tu nickname</label>
-      <input type="text" id="nicknameInput" placeholder="Ej: Gastón, La Rusa, Pelado…" maxlength="30">
+    <div class="form-card nickname-card">
+      <label class="nickname-label">
+        👤 Tu nombre o apodo
+        <span class="required-badge">REQUERIDO</span>
+      </label>
+      <input type="text" id="nicknameInput" placeholder="Ej: Gastón, La Rusa, Pelado…" maxlength="30" oninput="this.classList.remove('nickname-input-error')">
+      <p class="nickname-help">Tu nombre va a aparecer en el pedido grupal</p>
     </div>
     <div class="form-card">
       <label>¿Qué empanadas querés?</label>
@@ -75,6 +86,9 @@
     <button class="btn btn-success submit-btn" id="submitBtn" onclick="submitOrder()">
       Guardar pedido ✓
     </button>
+    <div class="back-link-wrap">
+      <button class="back-link" onclick="goHome()">← Volver al inicio</button>
+    </div>
   </div>
 </div>
 
@@ -99,6 +113,19 @@
     <div id="detailRows"></div>
     <div class="detail-total"><span>Total</span><span id="detailTotal"></span></div>
     <button class="btn btn-primary modal-close" onclick="closeMO('detailModal')">Cerrar</button>
+  </div>
+</div>
+
+<!-- EDIT ORDER MODAL -->
+<div class="modal-overlay" id="editModal" onclick="closeMO('editModal',event)">
+  <div class="modal">
+    <h3>Editar pedido de <span id="editModalName" style="color:#e67e22"></span></h3>
+    <div id="editModalRows"></div>
+    <div class="detail-total"><span>Total</span><span id="editModalTotal">0 🫓</span></div>
+    <div style="display:flex;gap:8px;margin-top:16px">
+      <button class="btn btn-success" style="flex:1" onclick="saveEditOrder()">Guardar ✓</button>
+      <button class="btn btn-danger" style="flex:1" onclick="closeMO('editModal')">Cancelar</button>
+    </div>
   </div>
 </div>
 

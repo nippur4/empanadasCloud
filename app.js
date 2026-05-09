@@ -6,6 +6,7 @@
 let sessionCode = null;
 let isReadonly = false;
 let currentListener = null; // código del listener activo de Firebase
+let editNick = null;
 
 // ── INICIALIZACIÓN ──────────────────────────────────────────
 // Lee el ?code= de la URL para saber si es vista de cliente o de organizador
@@ -74,6 +75,14 @@ function setStatus(msg) {
   document.getElementById("statusBar").innerHTML = msg;
 }
 
+function goHome() {
+  if (currentListener) {
+    db.ref(`orders/${currentListener}`).off();
+    currentListener = null;
+  }
+  showView("landingView");
+}
+
 function updateHostUI() {
   document.getElementById("linkBar").style.display      = isReadonly ? "none" : "flex";
   document.getElementById("resetBtn").style.display     = isReadonly ? "none" : "inline-flex";
@@ -99,6 +108,18 @@ function listenOrders(code) {
 }
 
 function renderDashboard(orders) {
+  // Total general
+  const grandTotal = orders.reduce((sum, o) => sum + o.total, 0);
+  const strip = document.getElementById("totalStrip");
+  if (grandTotal > 0) {
+    strip.style.display = "flex";
+    document.getElementById("totalCount").textContent = grandTotal;
+    document.getElementById("totalPeople").textContent =
+      `· ${orders.length} persona${orders.length !== 1 ? "s" : ""}`;
+  } else {
+    strip.style.display = "none";
+  }
+
   // Resumen por sabor
   const totals = {};
   orders.forEach(o =>
@@ -119,12 +140,14 @@ function renderDashboard(orders) {
   tbody.innerHTML = orders.length
     ? orders.sort((a, b) => a.ts - b.ts).map(o => {
         const key = nickToKey(o.nick);
+        const editBtn = isReadonly ? "" :
+          `<button class="btn btn-primary btn-sm" onclick="openEditModal('${esc(o.nick)}')">✏ Editar</button>`;
         const deleteBtn = isReadonly ? "" :
           `<button class="btn btn-danger btn-sm" onclick="deleteOrder('${esc(key)}','${esc(o.nick)}')">✕ Borrar</button>`;
         return `<tr>
           <td><button class="nick-btn" onclick="showDetail('${esc(o.nick)}')">${esc(o.nick)}</button></td>
           <td><span class="badge">${o.total} 🫓</span></td>
-          <td>${deleteBtn}</td>
+          <td style="white-space:nowrap">${editBtn ? editBtn + "&nbsp;" : ""}${deleteBtn}</td>
         </tr>`;
       }).join("")
     : `<tr><td colspan="3" class="empty-state">Nadie pidió todavía.</td></tr>`;
@@ -142,6 +165,70 @@ async function deleteOrder(key, nick) {
   } catch (err) {
     alert("Error al borrar el pedido. Intentá de nuevo.");
     console.error(err);
+  }
+}
+
+// ── EDITAR PEDIDO ────────────────────────────────────────────
+async function openEditModal(nick) {
+  try {
+    const snap = await db.ref(`orders/${sessionCode}`).get();
+    const data = snap.val() || {};
+    const o = Object.values(data).find(x => x.nick === nick);
+    if (!o) return;
+
+    editNick = nick;
+    document.getElementById("editModalName").textContent = nick;
+    document.getElementById("editModalRows").innerHTML = SABORES.map((s, i) => {
+      const qty = o.pedido[s] || 0;
+      return `<div class="emp-row">
+        <span class="emp-name">${esc(s)}</span>
+        <div class="qty-ctrl">
+          <button class="qty-btn" onclick="chgEdit(${i},-1)">−</button>
+          <span class="qty-val" id="eq${i}">${qty}</span>
+          <button class="qty-btn" onclick="chgEdit(${i},1)">+</button>
+        </div>
+      </div>`;
+    }).join("");
+    updateEditTotal();
+    document.getElementById("editModal").classList.add("open");
+  } catch (err) {
+    console.error("Error al cargar pedido para editar:", err);
+    alert("Error al cargar el pedido. Intentá de nuevo.");
+  }
+}
+
+function chgEdit(i, d) {
+  const el = document.getElementById("eq" + i);
+  el.textContent = Math.max(0, +el.textContent + d);
+  updateEditTotal();
+}
+
+function updateEditTotal() {
+  const total = SABORES.reduce((sum, s, i) => sum + (+document.getElementById("eq" + i).textContent), 0);
+  document.getElementById("editModalTotal").textContent = `${total} 🫓`;
+}
+
+async function saveEditOrder() {
+  const pedido = {}; let total = 0;
+  SABORES.forEach((s, i) => {
+    const q = +document.getElementById("eq" + i).textContent;
+    if (q > 0) { pedido[s] = q; total += q; }
+  });
+  if (!total) { alert("El pedido debe tener al menos una empanada."); return; }
+
+  const key = nickToKey(editNick);
+  const btn = document.querySelector("#editModal .btn-success");
+  btn.innerHTML = `<span class="spinner"></span>&nbsp;Guardando…`;
+  btn.disabled = true;
+  try {
+    await db.ref(`orders/${sessionCode}/${key}`).update({ pedido, total });
+    closeMO("editModal");
+  } catch (err) {
+    alert("Error al guardar los cambios. Intentá de nuevo.");
+    console.error(err);
+  } finally {
+    btn.innerHTML = "Guardar ✓";
+    btn.disabled = false;
   }
 }
 
@@ -298,7 +385,13 @@ function chg(i, d) {
 
 async function submitOrder() {
   const nick = document.getElementById("nicknameInput").value.trim();
-  if (!nick) { alert("Por favor ingresá tu nickname."); return; }
+  if (!nick) {
+    const input = document.getElementById("nicknameInput");
+    input.classList.add("nickname-input-error");
+    input.focus();
+    input.scrollIntoView({ behavior: "smooth", block: "center" });
+    return;
+  }
 
   const pedido = {}; let total = 0;
   SABORES.forEach((s, i) => {
