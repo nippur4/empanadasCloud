@@ -20,6 +20,9 @@
   <button class="btn btn-primary" style="font-size:16px;padding:14px 36px" onclick="goHost()">
     Soy el organizador →
   </button>
+  <button class="btn btn-ghost" id="returnSessionBtn" style="display:none;margin-top:12px">
+    ↩ Volver a mi sesión activa
+  </button>
 </div>
 
 <!-- HOST PANEL -->
@@ -30,6 +33,7 @@
     </h1>
     <div class="header-actions">
       <button class="btn btn-ghost" onclick="goHome()">← Inicio</button>
+      <button class="btn btn-success" id="orderBtn" onclick="goToOrder()">🫓 Hacer mi pedido</button>
       <button class="btn btn-primary" onclick="openHistoryModal()">📂 Historial</button>
       <button class="btn btn-danger" id="resetBtn" onclick="resetDashboard()">🗑 Reiniciar</button>
     </div>
@@ -87,7 +91,9 @@
       Guardar pedido ✓
     </button>
     <div class="back-link-wrap">
-      <button class="back-link" onclick="goHome()">← Volver al inicio</button>
+      <button class="back-link" onclick="goToPanel()">Ver resumen del pedido →</button>
+      <span class="back-link-sep">·</span>
+      <button class="back-link" onclick="goHome()">← Inicio</button>
     </div>
   </div>
 </div>
@@ -96,7 +102,10 @@
 <div id="successView" class="view">
   <div class="big-emoji">✅</div>
   <h2 class="big-title">¡Pedido guardado!</h2>
-  <p class="big-sub">Tu pedido fue registrado.<br>Podés cerrar esta página.</p>
+  <p class="big-sub">Tu pedido fue registrado.</p>
+  <button class="btn btn-primary" style="margin-top:24px;font-size:15px;padding:12px 28px" onclick="goToPanel()">
+    Ver resumen del pedido →
+  </button>
 </div>
 
 <!-- INVALID -->

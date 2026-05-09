@@ -3,29 +3,36 @@
 // Depende de: config.js (db), sabores.js (SABORES)
 // ─────────────────────────────────────────────
 
-let sessionCode = null;
-let isReadonly = false;
-let currentListener = null; // código del listener activo de Firebase
-let editNick = null;
+let sessionCode     = null;
+let isReadonly      = false;
+let isHistory       = false;  // true sólo al ver historial (no sesión activa)
+let currentListener = null;
+let editNick        = null;
 
 // ── INICIALIZACIÓN ──────────────────────────────────────────
-// Lee el ?code= de la URL para saber si es vista de cliente o de organizador
 async function init() {
   const params = new URLSearchParams(window.location.search);
-  const code = params.get("code");
+  const code   = params.get("code");
+  const panel  = params.get("panel");
 
   if (!code) {
     showView("landingView");
+    refreshReturnBtn();
     return;
   }
 
   try {
     const snap = await db.ref(`sessions/${code}`).get();
-    if (snap.exists()) {
-      sessionCode = code;
-      showClientView();
+    if (!snap.exists()) { showView("invalidView"); return; }
+
+    sessionCode = code;
+    if (panel === "1") {
+      const stored = getHostSession();
+      isReadonly = stored?.code !== code;
+      isHistory  = false;
+      enterAsHost(code);
     } else {
-      showView("invalidView");
+      showClientView();
     }
   } catch (err) {
     console.error("Error al verificar sesión:", err);
@@ -42,37 +49,59 @@ function showView(id) {
 // ── HOST ────────────────────────────────────────────────────
 async function goHost() {
   isReadonly = false;
+  isHistory  = false;
+
+  const code = genCode();
+  sessionCode = code;
+
   showView("hostView");
-
-  // Generar código y mostrar el link de inmediato (sin esperar a Firebase)
-  sessionCode = genCode();
-  setLinkDisplay(sessionCode);
+  setLinkDisplay(code);
   updateHostUI();
+  updateURL(code, true);
 
-  // Guardar sesión en Firebase en segundo plano
   const label = new Date().toLocaleString("es-AR", {
     day: "2-digit", month: "2-digit", year: "numeric",
     hour: "2-digit", minute: "2-digit"
   });
+  saveHostSession(code, label);
 
   try {
-    await db.ref(`sessions/${sessionCode}`).set({ createdAt: Date.now(), label });
+    await db.ref(`sessions/${code}`).set({ createdAt: Date.now(), label });
   } catch (err) {
     console.error("Error al crear sesión:", err);
     setStatus("⚠️ Error al conectar con Firebase. Revisá la configuración y las reglas de la base de datos.");
     return;
   }
 
-  listenOrders(sessionCode);
+  listenOrders(code);
+}
+
+// Entra al panel de una sesión existente (como host o readonly)
+function enterAsHost(code) {
+  sessionCode = code;
+  showView("hostView");
+  setLinkDisplay(code);
+  updateHostUI();
+  updateURL(code, true);
+  listenOrders(code);
 }
 
 function setLinkDisplay(code) {
-  const link = `${window.location.origin}${window.location.pathname}?code=${code}`;
-  document.getElementById("linkDisplay").textContent = link;
+  const url = new URL(window.location.origin + window.location.pathname);
+  url.searchParams.set("code", code);
+  document.getElementById("linkDisplay").textContent = url.toString();
 }
 
 function setStatus(msg) {
   document.getElementById("statusBar").innerHTML = msg;
+}
+
+function updateHostUI() {
+  document.getElementById("linkBar").style.display       = isReadonly ? "none" : "flex";
+  document.getElementById("resetBtn").style.display      = isReadonly ? "none" : "inline-flex";
+  document.getElementById("orderBtn").style.display      = isHistory  ? "none" : "inline-flex";
+  document.getElementById("readonlyBadge").style.display = isReadonly ? "inline-block" : "none";
+  document.getElementById("actionsHeader").textContent   = isReadonly ? "" : "Acciones";
 }
 
 function goHome() {
@@ -80,19 +109,44 @@ function goHome() {
     db.ref(`orders/${currentListener}`).off();
     currentListener = null;
   }
+  history.pushState({}, "", window.location.pathname);
   showView("landingView");
+  refreshReturnBtn();
 }
 
-function updateHostUI() {
-  document.getElementById("linkBar").style.display      = isReadonly ? "none" : "flex";
-  document.getElementById("resetBtn").style.display     = isReadonly ? "none" : "inline-flex";
-  document.getElementById("readonlyBadge").style.display = isReadonly ? "inline-block" : "none";
-  document.getElementById("actionsHeader").textContent  = isReadonly ? "" : "Acciones";
+// El organizador quiere hacer su propio pedido
+function goToOrder() {
+  if (currentListener) {
+    db.ref(`orders/${currentListener}`).off();
+    currentListener = null;
+  }
+  updateURL(sessionCode, false);
+  showClientView();
+}
+
+// Clientes (o el propio organizador) pasan a ver el panel
+function goToPanel() {
+  const stored = getHostSession();
+  isReadonly = stored?.code !== sessionCode;
+  isHistory  = false;
+  enterAsHost(sessionCode);
+}
+
+// Muestra/oculta el botón de retorno a sesión activa en el landing
+function refreshReturnBtn() {
+  const stored = getHostSession();
+  const btn = document.getElementById("returnSessionBtn");
+  if (!btn) return;
+  if (stored) {
+    btn.style.display = "inline-flex";
+    btn.onclick = () => { isReadonly = false; isHistory = false; enterAsHost(stored.code); };
+  } else {
+    btn.style.display = "none";
+  }
 }
 
 // ── LISTENER DE PEDIDOS EN TIEMPO REAL ──────────────────────
 function listenOrders(code) {
-  // Desuscribir listener anterior
   if (currentListener) {
     db.ref(`orders/${currentListener}`).off();
   }
@@ -154,17 +208,6 @@ function renderDashboard(orders) {
 
   if (!isReadonly) {
     setStatus(`<span class="dot"></span>&nbsp;En vivo · Última actualización: ${new Date().toLocaleTimeString("es-AR")}`);
-  }
-}
-
-// ── BORRAR PEDIDO INDIVIDUAL ─────────────────────────────────
-async function deleteOrder(key, nick) {
-  if (!confirm(`¿Borrar el pedido de "${nick}"?`)) return;
-  try {
-    await db.ref(`orders/${sessionCode}/${key}`).remove();
-  } catch (err) {
-    alert("Error al borrar el pedido. Intentá de nuevo.");
-    console.error(err);
   }
 }
 
@@ -232,6 +275,17 @@ async function saveEditOrder() {
   }
 }
 
+// ── BORRAR PEDIDO INDIVIDUAL ─────────────────────────────────
+async function deleteOrder(key, nick) {
+  if (!confirm(`¿Borrar el pedido de "${nick}"?`)) return;
+  try {
+    await db.ref(`orders/${sessionCode}/${key}`).remove();
+  } catch (err) {
+    alert("Error al borrar el pedido. Intentá de nuevo.");
+    console.error(err);
+  }
+}
+
 // ── REINICIAR DASHBOARD ──────────────────────────────────────
 async function resetDashboard() {
   if (!confirm("¿Borrás todos los pedidos y generás un link nuevo?")) return;
@@ -247,30 +301,33 @@ async function resetDashboard() {
     console.error("Error al borrar pedidos:", err);
   }
 
-  // Nueva sesión (link nuevo), la anterior queda en el historial
-  sessionCode = genCode();
+  const code = genCode();
+  sessionCode = code;
   const label = new Date().toLocaleString("es-AR", {
     day: "2-digit", month: "2-digit", year: "numeric",
     hour: "2-digit", minute: "2-digit"
   });
 
+  saveHostSession(code, label);
+
   try {
-    await db.ref(`sessions/${sessionCode}`).set({ createdAt: Date.now(), label });
+    await db.ref(`sessions/${code}`).set({ createdAt: Date.now(), label });
   } catch (err) {
     console.error("Error al crear nueva sesión:", err);
   }
 
   isReadonly = false;
-  setLinkDisplay(sessionCode);
+  isHistory  = false;
+  setLinkDisplay(code);
+  updateURL(code, true);
   updateHostUI();
-  listenOrders(sessionCode);
+  listenOrders(code);
 }
 
 // ── HISTORIAL ────────────────────────────────────────────────
 async function openHistoryModal() {
   document.getElementById("historyModal").classList.add("open");
-  document.getElementById("historyList").innerHTML =
-    `<p class="empty-state">Cargando…</p>`;
+  document.getElementById("historyList").innerHTML = `<p class="empty-state">Cargando…</p>`;
 
   try {
     const snap = await db.ref("sessions").orderByChild("createdAt").get();
@@ -281,20 +338,16 @@ async function openHistoryModal() {
       return;
     }
 
-    // Convertir a array y ordenar de más reciente a más antiguo
     const sessions = [];
     snap.forEach(child => sessions.push({ code: child.key, ...child.val() }));
     sessions.sort((a, b) => b.createdAt - a.createdAt);
 
-    // Obtener cantidad de pedidos por sesión
     const counts = await Promise.all(
       sessions.map(async s => {
         try {
           const o = await db.ref(`orders/${s.code}`).get();
           return o.exists() ? Object.keys(o.val()).length : 0;
-        } catch {
-          return 0;
-        }
+        } catch { return 0; }
       })
     );
 
@@ -318,14 +371,14 @@ async function openHistoryModal() {
 async function loadHistorySession(code) {
   closeMO("historyModal");
 
-  // Desuscribir listener en tiempo real
   if (currentListener) {
     db.ref(`orders/${currentListener}`).off();
     currentListener = null;
   }
 
   sessionCode = code;
-  isReadonly = true;
+  isReadonly  = true;
+  isHistory   = true;
   showView("hostView");
   updateHostUI();
 
@@ -405,7 +458,6 @@ async function submitOrder() {
   btn.disabled = true;
 
   try {
-    // Usar el nick como key → si la misma persona guarda de nuevo, pisa el pedido anterior
     const key = nickToKey(nick);
     await db.ref(`orders/${sessionCode}/${key}`).set({ nick, pedido, total, ts: Date.now() });
     showView("successView");
@@ -452,6 +504,23 @@ function esc(s) {
   return String(s)
     .replace(/&/g, "&amp;").replace(/</g, "&lt;")
     .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
+function updateURL(code, isPanel) {
+  const url = new URL(window.location.origin + window.location.pathname);
+  url.searchParams.set("code", code);
+  if (isPanel) url.searchParams.set("panel", "1");
+  history.replaceState({}, "", url);
+}
+
+// ── LOCALSTORAGE (sesión del organizador) ────────────────────
+function getHostSession() {
+  try { return JSON.parse(localStorage.getItem("empanadas_host_session")); }
+  catch { return null; }
+}
+
+function saveHostSession(code, label) {
+  localStorage.setItem("empanadas_host_session", JSON.stringify({ code, label }));
 }
 
 // ── ARRANQUE ─────────────────────────────────────────────────

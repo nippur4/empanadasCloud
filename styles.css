@@ -102,9 +102,10 @@ td{padding:11px 16px;font-size:14px;vertical-align:middle}
 .nickname-input-error{border-color:#c0392b !important;box-shadow:0 0 0 3px rgba(192,57,43,.12) !important}
 
 /* ── Link sutil cliente ── */
-.back-link-wrap{text-align:center;margin-top:14px}
+.back-link-wrap{text-align:center;margin-top:14px;display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:2px}
 .back-link{background:none;border:none;color:#ccc;font-size:12px;cursor:pointer;padding:4px 8px;font-family:inherit;text-decoration:underline}
 .back-link:hover{color:#999}
+.back-link-sep{color:#ddd;font-size:12px}
 
 /* ── Total general ── */
 .total-strip{background:#fff7ee;border:1.5px solid #f0c080;border-radius:10px;padding:12px 20px;display:flex;align-items:center;gap:10px;margin-bottom:20px;flex-wrap:wrap}
