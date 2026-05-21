@@ -93,6 +93,7 @@ td{padding:11px 16px;font-size:14px;vertical-align:middle}
 .hist-date{font-size:13px;font-weight:600}
 .hist-code{font-size:11px;color:#999;font-family:monospace;margin-top:2px}
 .hist-count{font-size:11px;color:#e67e22;margin-top:2px}
+.hist-mine{display:inline-block;background:#fff7ee;color:#e67e22;border:1px solid #f0c080;border-radius:6px;font-size:10px;font-weight:700;padding:1px 6px;margin-left:6px;text-transform:uppercase;letter-spacing:.04em;vertical-align:middle}
 
 /* ── Nickname requerido ── */
 .nickname-card{border-left:3px solid #e67e22 !important;background:#fffbf7 !important}

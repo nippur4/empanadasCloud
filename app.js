@@ -27,9 +27,9 @@ async function init() {
 
     sessionCode = code;
     if (panel === "1") {
-      const stored = getHostSession();
-      isReadonly = stored?.code !== code;
+      isReadonly = !isOwnedSession(code);
       isHistory  = false;
+      if (!isReadonly) setActiveSession(code);
       enterAsHost(code);
     } else {
       showClientView();
@@ -63,7 +63,7 @@ async function goHost() {
     day: "2-digit", month: "2-digit", year: "numeric",
     hour: "2-digit", minute: "2-digit"
   });
-  saveHostSession(code, label);
+  addOwnedSession(code, label);
 
   try {
     await db.ref(`sessions/${code}`).set({ createdAt: Date.now(), label });
@@ -126,8 +126,7 @@ function goToOrder() {
 
 // Clientes (o el propio organizador) pasan a ver el panel
 function goToPanel() {
-  const stored = getHostSession();
-  isReadonly = stored?.code !== sessionCode;
+  isReadonly = !isOwnedSession(sessionCode);
   isHistory  = false;
   enterAsHost(sessionCode);
 }
@@ -308,7 +307,7 @@ async function resetDashboard() {
     hour: "2-digit", minute: "2-digit"
   });
 
-  saveHostSession(code, label);
+  addOwnedSession(code, label);
 
   try {
     await db.ref(`sessions/${code}`).set({ createdAt: Date.now(), label });
@@ -325,47 +324,55 @@ async function resetDashboard() {
 }
 
 // ── HISTORIAL ────────────────────────────────────────────────
+// Mergea sesiones de Firebase + las propias en localStorage (dedupe por code),
+// así si la DB se vacía o el navegador es nuevo, igual ves tus sesiones.
 async function openHistoryModal() {
   document.getElementById("historyModal").classList.add("open");
   document.getElementById("historyList").innerHTML = `<p class="empty-state">Cargando…</p>`;
 
+  const owned = getOwnedSessions();
+  const ownedSet = new Set(owned.map(s => s.code));
+
+  let remote = [];
   try {
     const snap = await db.ref("sessions").orderByChild("createdAt").get();
+    if (snap.exists()) snap.forEach(c => remote.push({ code: c.key, ...c.val() }));
+  } catch (err) {
+    console.error("Error al cargar historial de Firebase:", err);
+  }
 
-    if (!snap.exists()) {
-      document.getElementById("historyList").innerHTML =
-        `<p class="empty-state">No hay sesiones guardadas.</p>`;
-      return;
-    }
+  const merged = new Map();
+  remote.forEach(s => merged.set(s.code, s));
+  owned.forEach(s => { if (!merged.has(s.code)) merged.set(s.code, s); });
+  const all = [...merged.values()].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
 
-    const sessions = [];
-    snap.forEach(child => sessions.push({ code: child.key, ...child.val() }));
-    sessions.sort((a, b) => b.createdAt - a.createdAt);
+  if (!all.length) {
+    document.getElementById("historyList").innerHTML =
+      `<p class="empty-state">No hay sesiones guardadas.</p>`;
+    return;
+  }
 
-    const counts = await Promise.all(
-      sessions.map(async s => {
-        try {
-          const o = await db.ref(`orders/${s.code}`).get();
-          return o.exists() ? Object.keys(o.val()).length : 0;
-        } catch { return 0; }
-      })
-    );
+  const counts = await Promise.all(all.map(async s => {
+    try {
+      const o = await db.ref(`orders/${s.code}`).get();
+      return o.exists() ? Object.keys(o.val()).length : 0;
+    } catch { return 0; }
+  }));
 
-    document.getElementById("historyList").innerHTML = sessions.map((s, i) => `
+  document.getElementById("historyList").innerHTML = all.map((s, i) => {
+    const mine = ownedSet.has(s.code);
+    const badge = mine ? `<span class="hist-mine">tuya</span>` : "";
+    const btnLabel = mine ? "Abrir →" : "Ver →";
+    return `
       <div class="hist-item">
         <div>
-          <div class="hist-date">${s.label || "Sesión sin fecha"}</div>
-          <div class="hist-code">Código: ${s.code}</div>
+          <div class="hist-date">${esc(s.label || "Sesión sin fecha")} ${badge}</div>
+          <div class="hist-code">Código: ${esc(s.code)}</div>
           <div class="hist-count">${counts[i]} persona${counts[i] !== 1 ? "s" : ""} pidieron</div>
         </div>
-        <button class="btn btn-primary btn-sm" onclick="loadHistorySession('${s.code}')">Ver →</button>
-      </div>`).join("");
-
-  } catch (err) {
-    console.error("Error al cargar historial:", err);
-    document.getElementById("historyList").innerHTML =
-      `<p class="empty-state" style="color:#c0392b">Error al cargar el historial. Revisá las reglas de Firebase.</p>`;
-  }
+        <button class="btn btn-primary btn-sm" onclick="loadHistorySession('${esc(s.code)}')">${btnLabel}</button>
+      </div>`;
+  }).join("");
 }
 
 async function loadHistorySession(code) {
@@ -377,10 +384,23 @@ async function loadHistorySession(code) {
   }
 
   sessionCode = code;
-  isReadonly  = true;
-  isHistory   = true;
+
+  if (isOwnedSession(code)) {
+    // Sesión propia → modo host completo, con listener en vivo
+    setActiveSession(code);
+    isReadonly = false;
+    isHistory  = false;
+    enterAsHost(code);
+    return;
+  }
+
+  // Sesión ajena → snapshot sólo lectura
+  isReadonly = true;
+  isHistory  = true;
   showView("hostView");
+  setLinkDisplay(code);
   updateHostUI();
+  updateURL(code, true);
 
   try {
     const [ordersSnap, metaSnap] = await Promise.all([
@@ -513,14 +533,55 @@ function updateURL(code, isPanel) {
   history.replaceState({}, "", url);
 }
 
-// ── LOCALSTORAGE (sesión del organizador) ────────────────────
-function getHostSession() {
-  try { return JSON.parse(localStorage.getItem("empanadas_host_session")); }
-  catch { return null; }
+// ── LOCALSTORAGE (sesiones del organizador) ──────────────────
+// Estructura:
+//   empanadas_host_sessions  → [{ code, label, createdAt }, ...]  (sesiones creadas en este dispositivo)
+//   empanadas_active_session → "CODE"  (puntero a la última activa, para "Volver a mi sesión")
+
+function getOwnedSessions() {
+  try {
+    const raw = localStorage.getItem("empanadas_host_sessions");
+    if (raw) return JSON.parse(raw) || [];
+
+    // Migración del formato viejo (objeto único)
+    const old = localStorage.getItem("empanadas_host_session");
+    if (old) {
+      const parsed = JSON.parse(old);
+      if (parsed?.code) {
+        const list = [{ code: parsed.code, label: parsed.label || "", createdAt: Date.now() }];
+        localStorage.setItem("empanadas_host_sessions", JSON.stringify(list));
+        localStorage.setItem("empanadas_active_session", parsed.code);
+        return list;
+      }
+    }
+    return [];
+  } catch { return []; }
 }
 
-function saveHostSession(code, label) {
-  localStorage.setItem("empanadas_host_session", JSON.stringify({ code, label }));
+function addOwnedSession(code, label) {
+  const list = getOwnedSessions();
+  if (!list.some(s => s.code === code)) {
+    list.unshift({ code, label, createdAt: Date.now() });
+    if (list.length > 100) list.length = 100;
+    localStorage.setItem("empanadas_host_sessions", JSON.stringify(list));
+  }
+  localStorage.setItem("empanadas_active_session", code);
+}
+
+function setActiveSession(code) {
+  localStorage.setItem("empanadas_active_session", code);
+}
+
+function isOwnedSession(code) {
+  return getOwnedSessions().some(s => s.code === code);
+}
+
+// Mantiene la forma {code, label} para los call-sites existentes
+function getHostSession() {
+  const code = localStorage.getItem("empanadas_active_session");
+  if (!code) return null;
+  const found = getOwnedSessions().find(s => s.code === code);
+  return found ? { code: found.code, label: found.label } : null;
 }
 
 // ── ARRANQUE ─────────────────────────────────────────────────
